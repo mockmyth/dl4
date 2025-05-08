@@ -1,0 +1,64 @@
+import pandas as pd 
+import numpy as np 
+from sklearn.preprocessing import MinMaxScaler 
+from keras.models import Sequential 
+from keras.layers import Dense, LSTM 
+from sklearn.metrics import mean_absolute_error, mean_squared_error 
+import tensorflow as tf 
+tf.config.run_functions_eagerly(True) 
+# Step 1: Data Preparation 
+data = pd.read_csv('goog1.csv') 
+scaler = MinMaxScaler(feature_range=(0, 1)) 
+scaled_data = scaler.fit_transform(data['Close'].values.reshape(-1, 1)) 
+# Step 2: Dataset Splitting 
+train_data = scaled_data[:int(len(scaled_data) * 0.8)] 
+test_data = scaled_data[int(len(scaled_data) * 0.8):] 
+# Step 3: Data Sequencing 
+def create_sequences(data, time_steps=6): 
+X = [] 
+y = [] 
+for i in range(len(data) - time_steps): 
+X.append(data[i:i+time_steps, 0]) 
+y.append(data[i+time_steps, 0]) 
+return np.array(X), np.array(y) 
+X_train, y_train = create_sequences(train_data) 
+X_test, y_test = create_sequences(test_data) 
+model = Sequential() 
+model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], 
+1))) 
+model.add(LSTM(units=50)) 
+model.add(Dense(units=1)) 
+model.compile(optimizer='adam', loss='mean_squared_error') 
+model.fit(X_train, y_train, epochs=50, batch_size=4) 
+# Step 5: Model Evaluation 
+y_pred = model.predict(X_test) 
+y_pred = scaler.inverse_transform(y_pred) 
+y_test = scaler.inverse_transform(y_test.reshape(-1, 1)) 
+mae = mean_absolute_error(y_test, y_pred) 
+mse = mean_squared_error(y_test, y_pred) 
+rmse = np.sqrt(mse) 
+print('MAE: ', mae) 
+print('MSE: ', mse) 
+print('RMSE: ', rmse) 
+# Step 6: Prediction 
+last_6_days = data['Close'][-6:].values 
+last_6_days_scaled = scaler.transform(last_6_days.reshape(-1, 1)) 
+X_pred = [] 
+X_pred.append(last_6_days_scaled) 
+X_pred = np.array(X_pred) 
+X_pred = np.reshape(X_pred, (X_pred.shape[0], X_pred.shape[1], 1)) 
+pred_price = model.predict(X_pred) 
+pred_price = scaler.inverse_transform(pred_price) 
+print('Predicted price for the next day: ', pred_price) 
+import matplotlib.pyplot as plt 
+# Plotting the original test data 
+plt.plot(y_test, label='Actual Price') 
+# Plotting the predicted prices 
+plt.plot(y_pred, label='Predicted Price') 
+plt.title('Actual vs Predicted Price') 
+plt.xlabel('Time') 
+plt.ylabel('Price') 
+plt.legend() 
+plt.grid(True) 
+plt.show() 
+ 
